@@ -1,0 +1,234 @@
+---
+title: "Dressify Competition Attempt"
+author: "Ashish Dalal"
+date: "3 December 2015"
+output: html_document
+---
+
+```{r}
+#clearing the workspace prior to start
+rm(list = ls())
+
+#loading libraries
+library(dplyr)
+library(ggplot2)
+library(magrittr)
+
+#reading the train data
+train <- read.csv("train.csv")
+
+#removing the unwanted variables
+train <- within(train,rm(X,X.1,X.2,X.3))
+
+#reading the test data
+test <- read.csv("test.csv")
+
+#reading in sample submission file
+sample_submission <- read.csv("sample_submission.csv")
+
+#attaching the datasets
+attach(train)
+attach(test)
+
+#overview of datasets
+
+#dimension of train set
+dim(train)
+
+#structure of train set
+str(train)
+
+#top few observations from train set
+head(train)
+
+#descriptive statistics of train set
+summary(train)
+
+#dimension of test set
+dim(test)
+
+#structure of test set
+str(test)
+
+#top few observations of test set
+head(test)
+
+#descriptive statistics of test set
+summary(test)
+
+#checking sample submission format
+head(sample_submission)
+
+#Data Wrangling
+
+#Checking out Style variable for both train and test sets
+
+levels(train$Style)
+summary(train$Style)
+levels(test$Style)
+summary(test$Style)
+
+qplot(data = train, x = Style,main = "Style frequency distribution in train data") + geom_bar()
+qplot(data = test,x = Style,main = "Style frequency distribution in test data") + geom_bar()
+
+#As we see "fashion" factor level is present in the data description that
+#was given to us, it is in the test set but DOES NOT figure anywhere in the 
+#train set
+
+table(train$Style,train$Recommended)
+prop.table(table(train$Style,train$Recommended),1)*100
+
+#We reduce the style categories by clubbing 
+train$Style[train$Style %in% c('Flare','Novelty','OL')] <- 'sexy'
+train$Style[train$Style %in% c('work')] <- 'vintage'
+train$Style <- factor(train$Style)
+
+#Performing the same on test set
+test$Style[test$Style %in% c('Flare','Novelty','OL','fashion')] <- 'sexy'
+test$Style[test$Style %in% c('work')] <- 'vintage'
+test$Style <- factor(test$Style)
+
+#checking out price variable for both test and train sets
+qplot(data = train,x = Price, main = "Price frequency distribution in train data") + geom_bar()
+levels(train$Price)
+qplot(data = test,x = Price,main = "Price frequency distribution in test data") + geom_bar()
+levels(test$Price)
+summary(train$Price)
+summary(test$Price)
+table(train$Price,train$Recommended)
+prop.table(table(train$Price,train$Recommended),1)*100
+
+#We see that price variable has "" factor level, let us check out the number of observations 
+#before getting to thinking of performing imputation
+subset(train,Price == "")
+
+#We find only one observation with missing rating, so we replace it by most frequently occuring 
+#price rating occuring in the price column
+summary(train$Price)
+train$Price[train$Price == ""] <- "Average"
+
+#Likewise, we check the test data and do the needful
+subset(test,Price == "")
+summary(test$Price)
+test$Price[test$Price == ""] <- "Average"
+
+#Next we assign the "low" to "Low", "high" to "High" factor levels
+train$Price[train$Price == "low"] <- "Low"
+train$Price[train$Price == "high"] <- "High"
+test$Price[test$Price == "low"] <- "Low"
+test$Price[test$Price == "high"] <- "High"
+
+#refactoring the price rating variable in both train and test sets
+train$Price <- factor(train$Price)
+test$Price <- factor(test$Price)
+summary(train$Price)
+summary(test$Price)
+
+#checking out rating variable for both test and train sets
+str(train$Rating)
+str(test$Rating)
+summary(train$Rating)
+summary(test$Rating)
+hist(train$Rating,main = "Rating in Train data",xlab = "Rating",col = "red")
+hist(test$Rating,main = "Rating in Test data",xlab = "Rating",col = "blue")
+
+#we see that there are no observations which have ratings from 1 to 3,
+#checking out the same
+dim(subset(train,Rating >=1 & Rating <= 3))
+#next we check number of observations having ratings between 0 to 1
+dim(subset(train,Rating >=0 & Rating <=1))
+#So we have all 82 observations which fall in above range
+#let us check the summary of the above range of rating scores
+summary(select(subset(train,Rating >=0 & Rating <=1),Rating))
+#So, we see all observations in above category have in fact, 0 rating
+
+#next we check the portion 3-4
+dim(subset(train,Rating >=3 & Rating <=3.5))
+dim(subset(train,Rating >=3.5 & Rating <=4))
+
+#and now we check portion 4-4.5 and 4.5-5
+dim(subset(train,Rating >=4 & Rating <=4.5))
+dim(subset(train,Rating >=4.5 & Rating <=5))
+
+#after observing the above results, we go for binning the rating variable
+#for both the train and test sets
+train$Rating[train$Rating >=0  & train$Rating <= 1 ] <- 0
+train$Rating[train$Rating >= 2.5 & train$Rating <= 4.5] <- 1
+train$Rating[train$Rating > 4.5 & train$Rating <= 5] <- 2
+
+#performing the same operations on test data, we get
+test$Rating[test$Rating >= 0 & test$Rating <= 1] <- 0
+test$Rating[test$Rating >= 2.5 & test$Rating <= 4.5] <- 1
+test$Rating[test$Rating > 4.5 & test$Rating <= 5] <- 2
+
+train$Rating <- factor(train$Rating)
+test$Rating <- factor(test$Rating)
+
+#revisiting rating
+table(train$Rating,train$Recommended)
+prop.table(table(train$Rating,train$Recommended),1)*100
+summary(train$Rating)
+summary(test$Rating)
+
+#checking the size variable for both test and train sets
+str(train$Size)
+str(test$Size)
+levels(train$Size)
+levels(test$Size)
+table(train$Size,train$Recommended)
+
+#we can see the levels of both the test and train sets don't match
+qplot(data = train,x = Size,main = "Frequency distribution of Size in train set") + geom_bar()
+train$Size[train$Size == "small"] <- "S"
+qplot(data = test,x = Size,main = "Frequency distribution of Size in test set") + geom_bar()
+test$Size[test$Size == "s"] <- "S"
+
+#re-factoring the Size variable in both test and train sets
+train$Size <- factor(train$Size)
+test$Size <- factor(test$Size)
+table(train$Size,train$Recommended)
+prop.table(table(train$Size,train$Recommended),1)*100
+
+#checking out the Season variable for both the test and train sets
+str(train$Season)
+str(test$Season)
+levels(train$Season)
+levels(test$Season)
+summary(train$Season)
+summary(test$Season)
+qplot(data = train,x = Season,main = "Frequency distribution of Season in train data") + geom_bar()
+qplot(data = test,x = Season,main = "Frequency distribution of Season in test data") + geom_bar()
+
+
+#doing trivial substitutions
+
+train$Season[train$Season == "Automn"] <- "Autumn"
+test$Season[test$Season == "Automn"] <- "Autumn"
+train$Season[train$Season == "spring"] <- "Spring"
+test$Season[test$Season == "spring"] <- "Spring"
+train$Season[train$Season == "winter"] <- "Winter"
+test$Season[test$Season == "winter"] <- "Winter"
+train$Season[train$Season == "summer"] <- "Summer"
+test$Season[test$Season == "summer"] <- "Summer"
+
+#we replace the "" factor level by majority imputation
+train$Season[train$Season == ""] <- "Summer"
+test$Season[test$Season == ""] <- "Summer"
+
+#re-factoring the Season in both train and test sets 
+train$Season <- factor(train$Season)
+test$Season <- factor(test$Season)
+
+#Checking Neckline variable in both train and test sets
+str(train$NeckLine)
+str(test$NeckLine)
+#we see that test data has one factor level than the train set
+levels(train$NeckLine)
+levels(test$NeckLine)
+
+#performing trivial substitutions
+train$NeckLine[train$NeckLine == "sweetheart"] <- "Sweetheart"
+train$NeckLine <- factor(train$NeckLine)
+
+
+```
